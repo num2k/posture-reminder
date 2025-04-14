@@ -24,7 +24,7 @@ const htmlFiles = ["popup/popup.html", "popup/stretching_guide.html"];
 async function minifyHtmlFiles() {
   try {
     for (const file of htmlFiles) {
-      const sourcePath = path.join(__dirname, "package", file);
+      const sourcePath = path.join(__dirname, "packages", file);
       const targetPath = path.join(__dirname, "dist", file);
 
       console.log(`미니파이: ${sourcePath}`);
