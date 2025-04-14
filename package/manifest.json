@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Posture Reminder",
+  "version": "1.0.0",
+  "description": "An extension that provides reminders to stretch or take breaks at regular intervals.",
+  "icons": {
+    "16": "assets/images/icon16.png",
+    "48": "assets/images/icon48.png",
+    "128": "assets/images/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/images/icon16.png",
+      "48": "assets/images/icon48.png",
+      "128": "assets/images/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "alarms", "notifications"]
+}

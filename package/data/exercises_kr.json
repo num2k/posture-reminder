@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "title": "목 스트레칭",
+    "category": "neck",
+    "description": "천천히 목을 오른쪽으로 기울이고 15초간 유지하세요. 그 다음 왼쪽도 반복합니다.",
+    "imageUrl": "../assets/images/neck_stretch.png"
+  },
+  {
+    "id": 2,
+    "title": "어깨 스트레칭",
+    "category": "shoulder",
+    "description": "오른쪽 팔꿈치를 가슴 쪽으로 잡아 당기고 15초간 유지하세요. 왼쪽도 반복합니다.",
+    "imageUrl": "../assets/images/shoulder_rotation.png"
+  },
+  {
+    "id": 3,
+    "title": "손목 스트레칭",
+    "category": "wrist",
+    "description": "한 손으로 다른 손의 손가락을 뒤로 당겨 손목을 스트레칭하고 15초간 유지하세요.",
+    "imageUrl": "../assets/images/wrist_stretch.png"
+  },
+  {
+    "id": 4,
+    "title": "눈 운동",
+    "category": "eye",
+    "description": "20-20-20 규칙: 20분마다 20피트(약 6미터) 멀리 있는 물체를 20초간 바라보세요.",
+    "imageUrl": "../assets/images/eye_exercise.png"
+  },
+  {
+    "id": 5,
+    "title": "등 스트레칭",
+    "category": "back",
+    "description": "의자에서 일어나 양팔을 천장 방향으로 뻗어 올리고 옆구리를 좌우로 스트레칭하세요.",
+    "imageUrl": "../assets/images/back_stretch.png"
+  },
+  {
+    "id": 6,
+    "title": "목 회전",
+    "category": "neck",
+    "description": "천천히 목을 시계 방향으로 돌린 후, 반시계 방향으로도 돌려주세요. 각각 3회씩 반복합니다.",
+    "imageUrl": "../assets/images/neck_rotation.png"
+  },
+  {
+    "id": 7,
+    "title": "어깨 펴기",
+    "category": "shoulder",
+    "description": "양 손을 등 뒤에서 마주 잡고 가슴을 펴며 어깨를 뒤로 젖혀주세요.",
+    "imageUrl": "../assets/images/shoulder_stretch.png"
+  },
+  {
+    "id": 8,
+    "title": "깊은 호흡",
+    "category": "back",
+    "description": "깊게 숨을 들이마시고 천천히 내쉬면서 어깨의 긴장을 풀어주세요. 5회 반복합니다.",
+    "imageUrl": "../assets/images/deep_breath.png"
+  },
+  {
+    "id": 9,
+    "title": "손목 회전",
+    "category": "wrist",
+    "description": "손목을 천천히 시계 방향으로 5회, 반시계 방향으로 5회 돌려줍니다.",
+    "imageUrl": "../assets/images/wrist_rotation.png"
+  },
+  {
+    "id": 10,
+    "title": "팔 스트레칭",
+    "category": "arm",
+    "description": "오른팔을 머리 위로 뻗어 올리고 왼손으로 오른쪽 팔꿈치를 잡아 당겨 스트레칭합니다. 반대쪽도 같은 방법으로 반복합니다.",
+    "imageUrl": "../assets/images/arm_stretch.png"
+  }
+]
