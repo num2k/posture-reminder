@@ -2,7 +2,7 @@
 
 > Your Companion for Healthy Computer Usage Habits
 
-![Posture Reminder](package/assets/images/icon128.png)
+![Posture Reminder](packages/assets/images/icon128.png)
 
 ## 📌 Introduction
 
