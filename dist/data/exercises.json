@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "title": "Neck Stretching",
+    "category": "neck",
+    "description": "Slowly tilt your neck to the right and hold for 15 seconds. Then repeat on the left side.",
+    "imageUrl": "../assets/images/neck_stretch.png"
+  },
+  {
+    "id": 2,
+    "title": "Shoulder Stretching",
+    "category": "shoulder",
+    "description": "Pull your right elbow toward your chest and hold for 15 seconds. Repeat on the left side.",
+    "imageUrl": "../assets/images/shoulder_rotation.png"
+  },
+  {
+    "id": 3,
+    "title": "Wrist Stretching",
+    "category": "wrist",
+    "description": "Use one hand to pull back the fingers of your other hand to stretch the wrist and hold for 15 seconds.",
+    "imageUrl": "../assets/images/wrist_stretch.png"
+  },
+  {
+    "id": 4,
+    "title": "Eye Exercise",
+    "category": "eye",
+    "description": "The 20-20-20 rule: Every 20 minutes, look at something 20 feet (about 6 meters) away for 20 seconds.",
+    "imageUrl": "../assets/images/eye_exercise.png"
+  },
+  {
+    "id": 5,
+    "title": "Back Stretching",
+    "category": "back",
+    "description": "Stand up from your chair, reach your arms toward the ceiling and stretch your sides left and right.",
+    "imageUrl": "../assets/images/back_stretch.png"
+  },
+  {
+    "id": 6,
+    "title": "Neck Rotation",
+    "category": "neck",
+    "description": "Slowly rotate your neck clockwise, then counterclockwise. Repeat 3 times in each direction.",
+    "imageUrl": "../assets/images/neck_rotation.png"
+  },
+  {
+    "id": 7,
+    "title": "Shoulder Opening",
+    "category": "shoulder",
+    "description": "Clasp your hands behind your back, open your chest and pull your shoulders back.",
+    "imageUrl": "../assets/images/shoulder_stretch.png"
+  },
+  {
+    "id": 8,
+    "title": "Deep Breathing",
+    "category": "back",
+    "description": "Take a deep breath in and slowly exhale while releasing tension from your shoulders. Repeat 5 times.",
+    "imageUrl": "../assets/images/deep_breath.png"
+  },
+  {
+    "id": 9,
+    "title": "Wrist Rotation",
+    "category": "wrist",
+    "description": "Rotate your wrists slowly clockwise 5 times, then counterclockwise 5 times.",
+    "imageUrl": "../assets/images/wrist_rotation.png"
+  },
+  {
+    "id": 10,
+    "title": "Arm Stretching",
+    "category": "arm",
+    "description": "Raise your right arm over your head and pull your right elbow with your left hand for a stretch. Repeat the same method on the opposite side.",
+    "imageUrl": "../assets/images/arm_stretch.png"
+  }
+]
