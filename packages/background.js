@@ -386,11 +386,28 @@ function isWithinWorkHours(startTime, endTime) {
   const startTotalMinutes = startHours * 60 + startMinutes;
   const endTotalMinutes = endHours * 60 + endMinutes;
 
-  // 현재 시간이 시작 시간과 종료 시간 사이인지 확인
-  return (
-    currentTotalMinutes >= startTotalMinutes &&
-    currentTotalMinutes <= endTotalMinutes
+  console.log(
+    `현재 시간: ${currentHours}:${currentMinutes} (${currentTotalMinutes}분)`
   );
+  console.log(
+    `근무 시작: ${startHours}:${startMinutes} (${startTotalMinutes}분)`
+  );
+  console.log(`근무 종료: ${endHours}:${endMinutes} (${endTotalMinutes}분)`);
+
+  // 종료 시간이 시작 시간보다 작은 경우 (예: 시작 22:00, 종료 06:00)
+  if (endTotalMinutes < startTotalMinutes) {
+    // 자정을 넘어가는 경우
+    return (
+      currentTotalMinutes >= startTotalMinutes ||
+      currentTotalMinutes <= endTotalMinutes
+    );
+  } else {
+    // 일반적인 경우
+    return (
+      currentTotalMinutes >= startTotalMinutes &&
+      currentTotalMinutes <= endTotalMinutes
+    );
+  }
 }
 
 // 알림을 표시합니다
