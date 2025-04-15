@@ -5,7 +5,7 @@
       "timeUntilNext": "until next reminder",
       "pauseBtn": "Pause",
       "resumeBtn": "Resume",
-      "resetBtn": "Restart",
+      "restart": "Restart",
       "quickSettings": "Quick Settings",
       "reminderInterval": "Reminder interval:",
       "todayStretchingTip": "Today's Stretching Tip",
@@ -17,7 +17,9 @@
       "min15": "15 min",
       "min30": "30 min",
       "min45": "45 min",
-      "hour1": "1 hour"
+      "hour1": "1 hour",
+      "startTimerBtn": "Start Timer",
+      "startTimerDesc": "Click to start for posture reminder"
     },
     "options": {
       "title": "Posture Reminder Settings",
@@ -45,7 +47,7 @@
       "save": "Save",
       "saved": "Saved!",
       "reset": "Reset",
-      "resetConfirm": "Are you sure you want to reset all settings? This cannot be undone."
+      "resetConfirm": "Are you sure you want to reset all settings?"
     },
     "stretching": {
       "title": "Stretching Exercise Guide",
@@ -78,7 +80,7 @@
       "timeUntilNext": "다음 알림까지",
       "pauseBtn": "일시정지",
       "resumeBtn": "재개",
-      "resetBtn": "재시작",
+      "restart": "재시작",
       "quickSettings": "빠른 설정",
       "reminderInterval": "알림 간격:",
       "todayStretchingTip": "오늘의 스트레칭 팁",
@@ -90,7 +92,9 @@
       "min15": "15 분",
       "min30": "30 분",
       "min45": "45 분",
-      "hour1": "1 시간"
+      "hour1": "1 시간",
+      "startTimerBtn": "타이머 시작",
+      "startTimerDesc": "자세 알림이를 시작하려면 클릭하세요"
     },
     "options": {
       "title": "자세 알림이 설정",
@@ -118,7 +122,7 @@
       "save": "저장",
       "saved": "저장됨!",
       "reset": "초기화",
-      "resetConfirm": "모든 설정을 초기화하시겠습니까? 이 작업은 취소할 수 없습니다."
+      "resetConfirm": "모든 설정을 초기화하시겠습니까?"
     },
     "stretching": {
       "title": "스트레칭 운동 가이드",

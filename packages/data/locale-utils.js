@@ -91,6 +91,8 @@ async function initLocalization(section) {
     if (
       area === "sync" &&
       changes.settings &&
+      changes.settings.newValue &&
+      changes.settings.oldValue &&
       changes.settings.newValue.language !== changes.settings.oldValue.language
     ) {
       currentLanguage = changes.settings.newValue.language;

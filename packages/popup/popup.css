@@ -78,7 +78,7 @@ h3 {
 .timer-section {
   background-color: #f0f6ff;
   border-radius: 8px;
-  padding: 16px;
+  padding: 16px 50px;
   margin-bottom: 16px;
   text-align: center;
 }
@@ -93,7 +93,8 @@ h3 {
   color: #175dce;
 }
 
-#next-reminder .paused {
+#next-reminder .paused,
+#next-reminder.paused {
   color: #6c757d;
 }
 
@@ -103,7 +104,33 @@ h3 {
   justify-content: center;
 }
 
+.timer-controls button {
+  flex: 1;
+}
+
+.button-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.button-icon-play {
+  display: none;
+}
+
+.paused .button-icon-play {
+  display: inline-block;
+}
+
+.paused .button-icon-pause {
+  display: none;
+}
+
 button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: #175dce;
   color: white;
   border: none;
@@ -118,16 +145,26 @@ button:hover {
   background-color: #0e4aa3;
 }
 
-button.paused {
+#pause-btn {
+  background-color: #5e5e5e;
+}
+#pause-btn:hover {
+  background-color: #535353;
+}
+
+#pause-btn.paused {
   background-color: #28a745;
+}
+#pause-btn.paused:hover {
+  background-color: #218838;
 }
 
 #reset-btn {
-  background-color: #6c757d;
+  background-color: #e76400;
 }
 
 #reset-btn:hover {
-  background-color: #5a6268;
+  background-color: #d75a00;
 }
 
 .setting-item {

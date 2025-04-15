@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>재시작</title>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect fill="#FF9500" x="0" y="0" width="24" height="24" rx="12"></rect>
+        <path d="M17,12 C17,14.7614 14.7614,17 12,17 C9.23858,17 7,14.7614 7,12 C7,9.23858 9.23858,7 12,7" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path>
+        <polygon fill="#FFFFFF" points="12 3 15 7 9 7"></polygon>
+    </g>
+</svg>
