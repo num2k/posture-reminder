@@ -1,12 +1,8 @@
 # Posture Reminder
 
 <p>
-<a href="https://chromewebstore.google.com/detail/bdenhaihmndfoeamojbflbjikfpdhohi?utm_source=item-share-cb" target="_blank"><img src="https://img.shields.io/badge/Chrome%20Webstore-1265f4" alt="chrome webstore"></a>
-
-<span><img src="https://img.shields.io/badge/Latest%20v1.0.0-111111" alt="latest version 1.0.0"></span>
-
-<a href="https://github.com/num2k/posture-reminder?tab=MIT-1-ov-file"><img src="https://img.shields.io/badge/MIT%20license-111111" alt="MIT license"></a>
-
+<a target="_blank" href="https://chromewebstore.google.com/detail/bdenhaihmndfoeamojbflbjikfpdhohi?utm_source=item-share-cb"><img src="https://img.shields.io/badge/Chrome%20Webstore-1265f4" alt="chrome webstore" /></a>
+<a href="https://github.com/num2k/posture-reminder/blob/main/LICENSE"><img src="https://img.shields.io/badge/MIT%20license-111111" alt="MIT license" /></a>
 </p>
 
 > Your Companion for Healthy Computer Usage Habits
