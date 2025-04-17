@@ -1,35 +1,17 @@
-// 메인 탭 요소들
-const nextReminderElement = document.getElementById("next-reminder");
-const pauseButton = document.getElementById("pause-btn");
-const resetButton = document.getElementById("reset-btn");
-const intervalSelect = document.getElementById("interval-select");
-const tipTitle = document.getElementById("tip-title");
-const tipDescription = document.getElementById("tip-description");
-const containerSection = document.querySelector(".container");
-
-// 시작 버튼 섹션 요소 선언
-let startButtonSection;
-
-// 설정 탭 요소들
-const customIntervalInput = document.getElementById("custom-interval");
-const intervalPresets = document.querySelectorAll(".interval-preset");
-const notificationsToggle = document.getElementById("notifications-toggle");
-const exercisesToggle = document.getElementById("exercises-toggle");
-const categoryCheckboxes = document.querySelectorAll(".category-item input");
-const workStartInput = document.getElementById("work-start");
-const workEndInput = document.getElementById("work-end");
-const workHoursOnlyToggle = document.getElementById("work-hours-only");
-const languageSelect = document.getElementById("language-select");
-const saveButton = document.getElementById("save-btn");
-const resetButtonOptions = document.getElementById("reset-btn-options");
-
-// 탭 관련 요소들
-const tabButtons = document.querySelectorAll(".tab-button");
-const tabContents = document.querySelectorAll(".tab-content");
+// ===============================
+// 상수 및 설정
+// ===============================
+const APP_CONSTANTS = {
+  DEFAULT_INTERVAL: 5, // 기본 타이머 간격(분)
+  MIN_INTERVAL: 1, // 최소 타이머 간격(분)
+  MAX_INTERVAL: 180, // 최대 타이머 간격(분)
+  ZERO_DISPLAY_TIME: 1000, // 0초 표시 시간(밀리초)
+  FEEDBACK_DISPLAY_TIME: 2000, // 피드백 메시지 표시 시간(밀리초)
+};
 
 // 기본 설정
 const DEFAULT_SETTINGS = {
-  interval: 5, // 기본 5분 간격
+  interval: APP_CONSTANTS.DEFAULT_INTERVAL, // 기본 5분 간격
   notifications: true,
   exercises: true,
   language: "en",
@@ -45,116 +27,252 @@ const DEFAULT_SETTINGS = {
   workEnd: "18:00",
   workHoursOnly: false,
   isPaused: false,
-  timerStarted: false, // 타이머 시작 여부 추가
+  timerStarted: false, // 타이머 시작 여부
 };
 
 // 현재 설정
 let settings = { ...DEFAULT_SETTINGS };
 
-// 타이머 업데이트 인터벌 ID
-let timerInterval;
+// 타이머 관련 변수
+let pausedTimeLeft = 0; // 일시 정지 시 남은 시간(밀리초)
+let timerInterval = null; // 타이머 인터벌 참조 (정리용)
 
-// 현재 알람 정보
-let currentAlarm = null;
+// ===============================
+// DOM 요소 선택자
+// ===============================
+const DOM = {
+  // 메인 탭 요소
+  nextReminder: document.getElementById("next-reminder"),
+  pauseButton: document.getElementById("pause-btn"),
+  resetButton: document.getElementById("reset-btn"),
+  intervalSelect: document.getElementById("interval-select"),
+  tipTitle: document.getElementById("tip-title"),
+  tipDescription: document.getElementById("tip-description"),
+  containerSection: document.querySelector(".container"),
 
-// 일시 정지 시 남은 시간을 저장하는 변수 (밀리초 단위)
-let pausedTimeLeft = 0;
+  // 설정 탭 요소
+  customIntervalInput: document.getElementById("custom-interval"),
+  intervalPresets: document.querySelectorAll(".interval-preset"),
+  notificationsToggle: document.getElementById("notifications-toggle"),
+  exercisesToggle: document.getElementById("exercises-toggle"),
+  categoryCheckboxes: document.querySelectorAll(".category-item input"),
+  workStartInput: document.getElementById("work-start"),
+  workEndInput: document.getElementById("work-end"),
+  workHoursOnlyToggle: document.getElementById("work-hours-only"),
+  languageSelect: document.getElementById("language-select"),
+  saveButton: document.getElementById("save-btn"),
+  resetButtonOptions: document.getElementById("reset-btn-options"),
 
-// 서비스워커 킵얼라이브 인터벌 ID
-let keepAliveInterval;
+  // 탭 관련 요소
+  tabButtons: document.querySelectorAll(".tab-button"),
+  tabContents: document.querySelectorAll(".tab-content"),
+};
 
-// 서비스워커 상태 확인 인터벌 ID
-let checkInterval;
+// 시작 버튼 섹션 요소 선언 (동적 생성)
+let startButtonSection;
 
-// 마지막으로 서비스워커 상태를 확인한 시간
-let lastCheckedTime = 0;
+// ===============================
+// 유틸리티 함수
+// ===============================
 
-// 번역 기능 초기화
-document.addEventListener("DOMContentLoaded", async () => {
-  // 언어 유틸리티 초기화
-  await i18n.init("popup");
+// 숫자를 2자리로 패딩
+function padZero(num) {
+  return num.toString().padStart(2, "0");
+}
 
-  // options 섹션 번역 로드
-  i18n.loadSection("options");
+/**
+ * 타이머 표시를 업데이트하는 유틸리티 함수
+ * 모든 타이머 표시 로직을 한 곳에서 처리하여 코드 중복 제거
+ *
+ * @param {number} minutes - 표시할 분
+ * @param {number} seconds - 표시할 초 (없으면 00으로 표시)
+ * @param {boolean} isPaused - 일시정지 상태 여부
+ */
+function updateTimerDisplay(minutes, seconds = 0, isPaused = false) {
+  if (isPaused) {
+    DOM.nextReminder.innerHTML = `<span class="paused">${padZero(
+      minutes
+    )}:${padZero(seconds)}</span>`;
+  } else {
+    DOM.nextReminder.textContent = `${padZero(minutes)}:${padZero(seconds)}`;
+  }
+}
 
-  // 시작 버튼 섹션 생성
-  createStartButtonSection();
-
-  // 기존 초기화 함수 호출
-  loadSettings();
-  loadStretchingTip();
-  initTabSystem();
-
-  // 서비스 워커 상태 확인 시작
-  startServiceWorkerMonitoring();
-});
-
-// 서비스 워커 모니터링 시작
-function startServiceWorkerMonitoring() {
-  // 기존 킵얼라이브 메커니즘 향상
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
+// ===============================
+// 타이머 클래스 정의
+// ===============================
+class PreciseTimer {
+  constructor(displayElement) {
+    this.displayElement = displayElement;
+    this.startTime = 0; // 타이머 시작 시간 (밀리초 단위)
+    this.duration = 0; // 타이머 지속 시간 (밀리초 단위)
+    this.isRunning = false; // 타이머 실행 상태
+    this.isPaused = false; // 일시정지 상태
+    this.remainingTime = 0; // 일시정지 시 남은 시간
+    this.animFrameId = null; // requestAnimationFrame ID
+    this.onComplete = null; // 타이머 완료 콜백
+    this.lastSecondTime = 0; // 마지막으로 초가 변경된 시간
+    this.isFirstCycle = true; // 첫 번째 사이클인지 여부
   }
 
-  // 더 짧은 간격으로 킵얼라이브 메시지를 보냄
-  keepAliveInterval = setInterval(() => {
-    // 타이머가 시작되지 않았으면 킵얼라이브 메시지를 보내지 않음
-    if (!settings.timerStarted) {
+  // 타이머 시작
+  start(durationMinutes, callback) {
+    // 콜백 설정
+    this.onComplete = callback || null;
+
+    // 이전 타이머 관련 자원 정리
+    this.cleanup();
+
+    // 타이머 시간 계산 (밀리초)
+    this.duration = durationMinutes * 60 * 1000;
+    this.startTime = Date.now();
+    this.isRunning = true;
+    this.isPaused = false;
+    this.lastSecondTime = this.startTime;
+
+    // 애니메이션 프레임 시작
+    this.update();
+
+    console.log(
+      `타이머 시작: ${durationMinutes}분, 종료 시간: ${new Date(
+        this.startTime + this.duration
+      ).toLocaleTimeString()}`
+    );
+  }
+
+  // 타이머 업데이트 (애니메이션 프레임 사용)
+  update = () => {
+    if (!this.isRunning || this.isPaused) return;
+
+    const now = Date.now();
+    const elapsedTime = now - this.startTime;
+    const timeLeft = Math.max(0, this.duration - elapsedTime);
+
+    // 남은 시간 계산
+    const totalSeconds = Math.ceil(timeLeft / 1000); // 올림 처리하여 항상 1초부터 표시 시작
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    // UI 업데이트 - 초가 변경될 때만 업데이트
+    const currentSecond = Math.floor(timeLeft / 1000);
+    const prevSecond = Math.floor((now - 10 - this.startTime) / 1000);
+
+    if (currentSecond !== prevSecond) {
+      this.displayTime(minutes, seconds);
+      this.lastSecondTime = now;
+    }
+
+    // 타이머 완료 확인
+    if (timeLeft <= 0) {
+      // 0초에 도달하면 정확히 0:00 표시
+      this.displayTime(0, 0);
+
+      // 타이머 정리
+      this.isRunning = false;
+      this.isFirstCycle = false;
+
+      // 애니메이션 프레임 취소
+      if (this.animFrameId) {
+        cancelAnimationFrame(this.animFrameId);
+        this.animFrameId = null;
+      }
+
+      // 콜백 함수 호출 (다음 사이클로 넘어가기 위해)
+      if (this.onComplete && typeof this.onComplete === "function") {
+        setTimeout(() => {
+          this.onComplete();
+        }, APP_CONSTANTS.ZERO_DISPLAY_TIME); // 0초를 정확히 1초간 표시하기 위해 지연
+      }
+
       return;
     }
 
-    // 서비스 워커에 킵얼라이브 메시지를 보냄
-    chrome.runtime.sendMessage({ action: "keepAlive" }, (response) => {
-      if (response && response.success) {
-        console.log(
-          "서비스 워커 활성화 상태 유지 중: " + new Date().toLocaleTimeString()
-        );
-      }
-    });
-  }, 15000); // 15초마다 킵얼라이브 메시지 보내기
+    // 다음 프레임 요청
+    this.animFrameId = requestAnimationFrame(this.update);
+  };
 
-  // 주기적으로 알림 상태를 확인하고 정리하는 인터벌
-  if (checkInterval) {
-    clearInterval(checkInterval);
-  }
-
-  checkInterval = setInterval(checkNotifications, 30000); // 30초마다 알림 상태 확인
-}
-
-// 알림 상태 확인 및 정리
-function checkNotifications() {
-  // 타이머가 시작되지 않았으면 실행하지 않음
-  if (!settings.timerStarted) {
-    return;
-  }
-
-  // 마지막 확인 이후 너무 짧은 시간이 지나지 않았으면 실행하지 않음
-  const now = Date.now();
-  if (now - lastCheckedTime < 25000) {
-    // 25초 이내에는 중복 실행 방지
-    return;
-  }
-
-  lastCheckedTime = now;
-
-  // 알림 상태 확인 메시지 전송
-  chrome.runtime.sendMessage({ action: "checkNotifications" }, (response) => {
-    if (response && response.success) {
-      console.log(`알림 상태 확인 완료: ${response.activeCount}개 활성 알림`);
-    } else {
-      console.warn("알림 상태 확인 실패");
-
-      // 서비스 워커가 비활성화된 경우 재시작 시도
-      if (chrome.runtime.lastError) {
-        console.warn(
-          "서비스 워커가 비활성화된 것으로 보입니다. 재활성화 시도 중..."
-        );
-        // 알람 설정을 초기화하여 서비스 워커를 재활성화
-        chrome.runtime.sendMessage({ action: "resetAlarm" });
+  // 시간 표시 함수
+  displayTime(minutes, seconds) {
+    if (this.displayElement) {
+      if (this.isPaused) {
+        this.displayElement.innerHTML = `<span class="paused">${padZero(
+          minutes
+        )}:${padZero(seconds)}</span>`;
+      } else {
+        this.displayElement.textContent = `${padZero(minutes)}:${padZero(
+          seconds
+        )}`;
       }
     }
-  });
+  }
+
+  // 타이머 일시정지
+  pause() {
+    if (this.isRunning && !this.isPaused) {
+      this.isPaused = true;
+      const now = Date.now();
+      const elapsedTime = now - this.startTime;
+      this.remainingTime = Math.max(0, this.duration - elapsedTime);
+      this.cleanup(); // 모든 타이머 정리
+
+      // 일시정지된 시간을 표시
+      const totalSeconds = Math.ceil(this.remainingTime / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      this.displayElement.innerHTML = `<span class="paused">${padZero(
+        minutes
+      )}:${padZero(seconds)}</span>`;
+
+      console.log(
+        `타이머 일시정지: 남은 시간 ${Math.floor(this.remainingTime / 1000)}초`
+      );
+    }
+  }
+
+  // 타이머 재개
+  resume() {
+    if (this.isPaused && this.remainingTime > 0) {
+      this.isPaused = false;
+      this.duration = this.remainingTime;
+      this.startTime = Date.now();
+      this.lastSecondTime = this.startTime;
+      this.isRunning = true;
+      this.update();
+      console.log(
+        `타이머 재개: 남은 시간 ${Math.floor(this.remainingTime / 1000)}초`
+      );
+    }
+  }
+
+  // 타이머 리셋
+  reset() {
+    this.cleanup();
+    this.isRunning = false;
+    this.isPaused = false;
+    this.remainingTime = 0;
+  }
+
+  // 모든 타이머 자원 정리
+  cleanup() {
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+  }
+
+  // 현재 남은 시간 가져오기 (밀리초)
+  getRemainingTime() {
+    if (!this.isRunning && !this.isPaused) return 0;
+    if (this.isPaused) return this.remainingTime;
+
+    const now = Date.now();
+    const elapsedTime = now - this.startTime;
+    return Math.max(0, this.duration - elapsedTime);
+  }
 }
+
+// 타이머 인스턴스 생성
+const preciseTimer = new PreciseTimer(DOM.nextReminder);
 
 // 시작 버튼 섹션 생성
 function createStartButtonSection() {
@@ -218,43 +336,161 @@ function hideStartButton() {
 function startTimer() {
   // 설정 업데이트
   settings.timerStarted = true;
-  chrome.storage.sync.set({ settings });
+  settings.isPaused = false;
 
   // 시작 버튼 숨기기
   hideStartButton();
 
-  // 타이머 UI 표시
-  const interval = settings.interval || 30;
-  nextReminderElement.textContent = `${padZero(interval)}:00`;
+  // 설정 저장
+  chrome.storage.sync.set({ settings }, () => {
+    chrome.runtime.sendMessage({ action: "startTimer" }, (response) => {
+      if (response && response.success) {
+        console.log("타이머가 시작되었습니다.");
 
-  // 새로운 'startTimer' 액션을 사용하여 background.js에 타이머 시작 요청
-  chrome.runtime.sendMessage({ action: "startTimer" }, (response) => {
+        // 정밀한 타이머 시작
+        preciseTimer.start(settings.interval, onTimerComplete);
+      } else {
+        console.error("타이머 시작 실패:", response?.message);
+      }
+    });
+  });
+}
+
+// 타이머 완료 시 호출되는 콜백
+function onTimerComplete() {
+  // 다음 타이머 시작 준비
+  const newMinutes = settings.interval <= 1 ? 0 : settings.interval - 1;
+  updateTimerDisplay(newMinutes, 59, false);
+
+  // 백그라운드에 알람 재설정 요청
+  chrome.runtime.sendMessage({ action: "resetAlarm" }, (response) => {
     if (response && response.success) {
-      console.log("타이머가 시작되었습니다.");
+      console.log(
+        `알람 재설정 성공, 다음 알람 예정: ${new Date(
+          response.nextAlarmAt
+        ).toLocaleTimeString()}`
+      );
 
-      // 타이머 업데이트 시작
-      startTimerUpdate();
-
-      // 서비스워커 모니터링 시작
-      startServiceWorkerMonitoring();
+      // 새 타이머 시작 (초기 시간을 59초로 설정)
+      // 타이머 시간에서 1초를 빼서 정확히 MM:59부터 시작하도록 함
+      preciseTimer.start(settings.interval - 1 / 60, onTimerComplete);
     } else {
-      console.error("타이머 시작 실패:", response?.message);
+      console.error("알람 재설정 실패:", response?.message);
+
+      // 실패해도 새 타이머는 시작 (초기 시간을 59초로 설정)
+      preciseTimer.start(settings.interval - 1 / 60, onTimerComplete);
     }
   });
 }
 
+// 타이머 중지
+function stopTimer() {
+  // 타이머 중지 상태로 설정
+  settings.timerStarted = false;
+  settings.isPaused = false;
+
+  // 설정 저장
+  chrome.storage.sync.set({ settings });
+
+  // 정밀 타이머 리셋
+  preciseTimer.reset();
+
+  // 타이머 초기화 (설정된 인터벌 시간 표시)
+  updateTimerDisplay(settings.interval, 0, true);
+
+  // 백그라운드 서비스에 타이머 중지 요청
+  chrome.runtime.sendMessage({ action: "stopTimer" }, (response) => {
+    if (response && response.success) {
+      console.log("타이머가 중지되었습니다.");
+
+      // 시작 버튼 표시
+      showStartButton();
+    } else {
+      console.error(
+        "타이머 중지 실패:",
+        chrome.runtime.lastError || "알 수 없는 오류"
+      );
+    }
+  });
+}
+
+// 알람 일시정지/재개 토글
+function togglePause() {
+  const wasPaused = settings.isPaused;
+
+  if (!wasPaused) {
+    // 일시 정지
+    settings.isPaused = true;
+    preciseTimer.pause();
+
+    // 남은 시간 저장
+    pausedTimeLeft = preciseTimer.getRemainingTime();
+    chrome.storage.sync.set({ settings, pausedTimeLeft });
+
+    // 알람을 일시정지
+    chrome.alarms.clear("postureReminderAlarm");
+    chrome.alarms.clear("postureReminderPrepare");
+
+    // UI 업데이트
+    updatePauseButtonState();
+  } else {
+    // 재개
+    settings.isPaused = false;
+    chrome.storage.sync.set({ settings });
+
+    if (pausedTimeLeft > 0) {
+      // 남은 시간을 분 단위로 변환 (소수점 포함)
+      const remainingMinutes = pausedTimeLeft / (60 * 1000);
+
+      // 특정 시간으로 알람을 재설정하는 메시지 전송
+      chrome.runtime.sendMessage({
+        action: "resumeAlarm",
+        delayInMinutes: remainingMinutes,
+      });
+
+      // 타이머 재개
+      preciseTimer.resume();
+
+      // 저장된 시간 초기화
+      pausedTimeLeft = 0;
+      chrome.storage.sync.remove("pausedTimeLeft");
+    } else {
+      // 저장된 시간이 없으면 기본 간격으로 재설정
+      chrome.runtime.sendMessage({ action: "resetAlarm" });
+      preciseTimer.start(settings.interval, onTimerComplete);
+    }
+
+    // UI 업데이트
+    updatePauseButtonState();
+  }
+}
+
+// 알람 리셋
+function resetAlarm() {
+  settings.isPaused = false;
+  chrome.storage.sync.set({ settings });
+  chrome.runtime.sendMessage({ action: "resetAlarm" }, (response) => {
+    if (response && response.success) {
+      // 타이머 재시작
+      preciseTimer.reset();
+      preciseTimer.start(settings.interval, onTimerComplete);
+    }
+  });
+  updatePauseButtonState();
+}
+
 // 탭 시스템 초기화
 function initTabSystem() {
-  tabButtons.forEach((button) => {
+  DOM.tabButtons.forEach((button) => {
     button.addEventListener("click", () => {
       // 모든 탭 버튼에서 active 클래스 제거
-      tabButtons.forEach((btn) => btn.classList.remove("active"));
+      DOM.tabButtons.forEach((btn) => btn.classList.remove("active"));
 
       // 클릭한 버튼에 active 클래스 추가
       button.classList.add("active");
 
       // 모든 탭 컨텐츠 숨기기
-      tabContents.forEach((content) => (content.style.display = "none"));
+      DOM.tabContents.forEach((content) => (content.style.display = "none"));
 
       // 해당 탭 컨텐츠 표시
       const tabId = button.getAttribute("data-tab");
@@ -285,23 +521,43 @@ function loadSettings() {
       // UI 업데이트
       updateAllUIElements();
 
-      // 타이머가 시작되지 않았으면 시작 버튼 표시
+      // 타이머 상태에 따라 UI 초기화
       if (!settings.timerStarted) {
         showStartButton();
       } else {
         hideStartButton();
-        // 타이머 업데이트 시작
-        startTimerUpdate();
-        // 서비스워커 모니터링 시작
-        startServiceWorkerMonitoring();
+        // 타이머 상태 복원
+        if (settings.timerStarted && !settings.isPaused) {
+          // 알람 정보를 가져와서 남은 시간 계산
+          chrome.alarms.get("postureReminderAlarm", (alarm) => {
+            if (alarm) {
+              const now = Date.now();
+              const timeLeft = Math.max(0, alarm.scheduledTime - now);
+              const minutes = timeLeft / (60 * 1000);
+
+              // 정밀 타이머 시작
+              preciseTimer.start(minutes, onTimerComplete);
+            } else {
+              // 알람이 없으면 기본 간격으로 시작
+              preciseTimer.start(settings.interval, onTimerComplete);
+            }
+          });
+        } else if (
+          settings.timerStarted &&
+          settings.isPaused &&
+          pausedTimeLeft > 0
+        ) {
+          // 일시정지 상태 복원
+          const minutes = Math.floor(pausedTimeLeft / 60000);
+          const seconds = Math.floor((pausedTimeLeft % 60000) / 1000);
+          updateTimerDisplay(minutes, seconds, true);
+        }
       }
     } else {
       // 설정이 없으면 기본값 저장
       chrome.storage.sync.set({ settings });
-      intervalSelect.value = settings.interval;
-      nextReminderElement.innerHTML = `<span class="paused">${padZero(
-        settings.interval
-      )}:00</span>`;
+      DOM.intervalSelect.value = settings.interval;
+      updateTimerDisplay(settings.interval, 0, true);
       showStartButton();
     }
   });
@@ -318,17 +574,37 @@ function updateAllUIElements() {
 
 // 메인 탭 UI를 업데이트
 function updateMainTabUI() {
-  intervalSelect.value = settings.interval;
+  DOM.intervalSelect.value = settings.interval;
   updatePauseButtonState();
-  // nextReminderElement.textContent = `${padZero(settings.interval)}:00`;
-  nextReminderElement.innerHTML = `<span class="paused">${padZero(
-    settings.interval
-  )}:00</span>`;
+
+  // 일시 정지 상태일 때는 타이머 표시를 업데이트하지 않음
+  if (settings.isPaused) {
+    return; // 일시 정지 중에는 타이머 표시 유지
+  }
+
+  if (settings.timerStarted && !settings.isPaused) {
+    // 타이머 실행 중인 경우는 preciseTimer에 맡김
+    if (!preciseTimer.isRunning) {
+      chrome.alarms.get("postureReminderAlarm", (alarm) => {
+        if (alarm) {
+          const now = Date.now();
+          const timeLeft = Math.max(0, alarm.scheduledTime - now);
+          const minutes = timeLeft / (60 * 1000);
+          preciseTimer.start(minutes, onTimerComplete);
+        } else {
+          preciseTimer.start(settings.interval, onTimerComplete);
+        }
+      });
+    }
+  } else if (!settings.timerStarted) {
+    // 타이머가 시작되지 않은 경우만 기본 인터벌 시간 표시
+    updateTimerDisplay(settings.interval, 0, true);
+  }
 }
 
 // 인터벌 프리셋 UI를 업데이트
 function updateIntervalPresetsUI(number) {
-  intervalPresets.forEach((preset) => {
+  DOM.intervalPresets.forEach((preset) => {
     const value = parseInt(preset.dataset.value);
     if (value === number) {
       preset.classList.add("active");
@@ -340,17 +616,17 @@ function updateIntervalPresetsUI(number) {
 
 // 설정 탭 UI를 업데이트
 function updateSettingsTabUI() {
-  customIntervalInput.value = settings.interval;
-  notificationsToggle.checked = settings.notifications;
-  exercisesToggle.checked = settings.exercises;
+  DOM.customIntervalInput.value = settings.interval;
+  DOM.notificationsToggle.checked = settings.notifications;
+  DOM.exercisesToggle.checked = settings.exercises;
 
   // 언어 선택 UI 업데이트
-  languageSelect.value = settings.language || "en";
+  DOM.languageSelect.value = settings.language || "en";
 
   updateIntervalPresetsUI(settings.interval); // 인터벌 프리셋 업데이트
 
   // 카테고리 체크박스를 업데이트
-  categoryCheckboxes.forEach((checkbox) => {
+  DOM.categoryCheckboxes.forEach((checkbox) => {
     const category = checkbox.dataset.category;
     if (settings.categories && settings.categories[category] !== undefined) {
       checkbox.checked = settings.categories[category];
@@ -358,16 +634,16 @@ function updateSettingsTabUI() {
   });
 
   // 작업 시간 설정을 업데이트
-  workStartInput.value = settings.workStart;
-  workEndInput.value = settings.workEnd;
-  workHoursOnlyToggle.checked = settings.workHoursOnly;
+  DOM.workStartInput.value = settings.workStart;
+  DOM.workEndInput.value = settings.workEnd;
+  DOM.workHoursOnlyToggle.checked = settings.workHoursOnly;
 }
 
 // data-i18n 속성이 없는 동적 텍스트 요소들을
 // 수동으로 번역하는 함수
 function updateDynamicTexts(lang) {
   // 인터벌 프리셋 버튼 텍스트 업데이트
-  intervalPresets.forEach((preset) => {
+  DOM.intervalPresets.forEach((preset) => {
     const value = preset.dataset.value;
     if (value === "15")
       preset.textContent = "15 " + (lang === "ko" ? "분" : "min");
@@ -383,270 +659,186 @@ function updateDynamicTexts(lang) {
   updatePauseButtonState();
 
   // 재시작 버튼
-  if (resetButton) {
-    resetButton.querySelector("[data-i18n='restart']").textContent = i18n.get(
-      "popup",
-      "restart"
-    );
+  if (DOM.resetButton) {
+    DOM.resetButton.querySelector("[data-i18n='restart']").textContent =
+      i18n.get("popup", "restart");
   }
 
   // 저장 및 재설정 버튼 텍스트 업데이트
-  if (saveButton) {
-    saveButton.textContent = i18n.get("options", "save");
+  if (DOM.saveButton) {
+    DOM.saveButton.textContent = i18n.get("options", "save");
   }
 
-  if (resetButtonOptions) {
-    resetButtonOptions.textContent = i18n.get("options", "reset");
+  if (DOM.resetButtonOptions) {
+    DOM.resetButtonOptions.textContent = i18n.get("options", "reset");
   }
 
   // 스트레칭 팁 다시 로드
   loadStretchingTip();
 }
 
-// 타이머 업데이트를 시작
-async function startTimerUpdate() {
-  // 타이머 인터벌이 이미 있으면 제거
-  if (timerInterval) {
-    clearInterval(timerInterval);
-  }
-
-  // 첫 업데이트 실행
-  await updateTimer();
-
-  // 타이머 인터벌 설정 (1초마다 업데이트)
-  timerInterval = setInterval(async () => {
-    await updateTimer();
-  }, 1000);
-
-  console.log("타이머 업데이트 시작됨: " + new Date().toLocaleTimeString());
-}
-
-// 킵얼라이브 메커니즘 시작
-function startKeepAlive() {
-  // 기존 킵얼라이브 인터벌이 있으면 제거
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-  }
-
-  // 새로운 킵얼라이브 인터벌 설정 (더 짧은 간격으로)
-  keepAliveInterval = setInterval(() => {
-    // 타이머가 시작되지 않았거나 일시 정지 상태인 경우 킵얼라이브 메시지를 보내지 않음
-    if (!settings.timerStarted || settings.isPaused) {
-      return;
-    }
-
-    // 서비스 워커에 킵얼라이브 메시지를 보냄
-    chrome.runtime.sendMessage({ action: "keepAlive" }, (response) => {
-      if (response && response.success) {
-        console.log(
-          "서비스 워커 활성화 상태 유지 중: " + new Date().toLocaleTimeString()
-        );
-      } else if (chrome.runtime.lastError) {
-        console.warn(
-          "서비스 워커에 연결할 수 없습니다. 재활성화를 시도합니다."
-        );
-        // 알람 재설정 시도
-        chrome.runtime.sendMessage({ action: "resetAlarm" });
-      }
-    });
-  }, 15000); // 15초마다 킵얼라이브 메시지 보내기
-}
-
-// 타이머 표시를 업데이트
-function updateTimer() {
-  return new Promise((resolve) => {
-    if (settings.isPaused && pausedTimeLeft > 0) {
-      // 일시 정지 상태에서는 마지막으로 저장된 시간을 표시
-      const totalSeconds = Math.floor(pausedTimeLeft / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-
-      nextReminderElement.innerHTML = `
-        <span class="paused">${padZero(minutes)}:${padZero(seconds)}</span>
-      `;
-      resolve();
-      return;
-    }
-
-    if (!settings.timerStarted) {
-      // 타이머가 시작되지 않은 경우
-      nextReminderElement.innerHTML = `<span class="paused">${padZero(
-        settings.interval
-      )}:00</span>`;
-      resolve();
-      return;
-    }
-
-    chrome.alarms.get("postureReminderAlarm", (alarm) => {
-      currentAlarm = alarm;
-
-      if (alarm && !settings.isPaused) {
-        const now = Date.now();
-        const alarmTime = alarm.scheduledTime;
-        const timeLeft = Math.max(0, alarmTime - now);
-
-        // 시간과 초를 직접 계산
-        const totalSeconds = Math.floor(timeLeft / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-
-        // 디버그 로그는 30초마다 출력 (너무 많은 로그 방지)
-        if (seconds % 30 === 0 || seconds === 0) {
-          console.log(
-            `타이머 업데이트: ${padZero(minutes)}:${padZero(
-              seconds
-            )} (${new Date().toLocaleTimeString()})`
-          );
-        }
-
-        nextReminderElement.textContent = `${padZero(minutes)}:${padZero(
-          seconds
-        )}`;
-      } else {
-        // 알람이 없거나 남은 시간이 없을 때
-        nextReminderElement.textContent = `${padZero(settings.interval)}:00`;
-      }
-      resolve();
-    });
-  });
-}
-
-// 숫자를 2자리로 패딩
-function padZero(num) {
-  return num.toString().padStart(2, "0");
-}
-
 // 일시정지 버튼 상태를 업데이트
 function updatePauseButtonState() {
   if (settings.isPaused) {
-    pauseButton.classList.add("paused");
-    pauseButton.querySelector("[data-i18n='pauseBtn']").textContent = i18n.get(
-      "popup",
-      "resumeBtn"
-    );
-    // pauseButton.setAttribute("title", i18n.get("popup", "resumeBtn"));
+    DOM.pauseButton.classList.add("paused");
+    DOM.pauseButton.querySelector("[data-i18n='pauseBtn']").textContent =
+      i18n.get("popup", "resumeBtn");
   } else {
-    pauseButton.classList.remove("paused");
-    pauseButton.querySelector("[data-i18n='pauseBtn']").textContent = i18n.get(
-      "popup",
-      "pauseBtn"
-    );
-    // pauseButton.setAttribute("title", i18n.get("popup", "pauseBtn"));
+    DOM.pauseButton.classList.remove("paused");
+    DOM.pauseButton.querySelector("[data-i18n='pauseBtn']").textContent =
+      i18n.get("popup", "pauseBtn");
   }
-}
-
-// 알람 일시정지/재개 토글
-function togglePause() {
-  const wasPaused = settings.isPaused;
-
-  if (!wasPaused) {
-    // 일시 정지하려는 경우
-    if (currentAlarm) {
-      const now = new Date().getTime();
-      const alarmTime = currentAlarm.scheduledTime;
-      pausedTimeLeft = Math.max(0, alarmTime - now);
-      console.log(
-        `일시 정지: 남은 시간 ${Math.floor(pausedTimeLeft / 1000)}초 저장됨`
-      );
-
-      // 남은 시간을 storage에 저장
-      chrome.storage.sync.set({ pausedTimeLeft });
-    }
-
-    // 상태를 먼저 변경
-    settings.isPaused = true;
-    chrome.storage.sync.set({ settings });
-
-    // 알람을 일시정지
-    chrome.alarms.clear("postureReminderAlarm");
-    // 준비 알람도 일시정지
-    chrome.alarms.clear("postureReminderPrepare");
-
-    // 킵얼라이브 중지
-    if (keepAliveInterval) {
-      clearInterval(keepAliveInterval);
-      keepAliveInterval = null;
-    }
-  } else {
-    // 재개하려는 경우
-    // 상태를 먼저 변경
-    settings.isPaused = false;
-    chrome.storage.sync.set({ settings });
-
-    // 재개할 때 저장된 남은 시간으로 알람 설정
-    if (pausedTimeLeft > 0) {
-      // 남은 시간을 분 단위로 변환 (소수점 포함)
-      const remainingMinutes = pausedTimeLeft / (60 * 1000);
-      console.log(
-        `재개: 남은 ${remainingMinutes.toFixed(2)}분으로 알람 재설정`
-      );
-
-      // 특정 시간으로 알람을 재설정하는 메시지 전송
-      chrome.runtime.sendMessage({
-        action: "resumeAlarm",
-        delayInMinutes: remainingMinutes,
-      });
-
-      // 재개 후 저장된 시간 초기화
-      pausedTimeLeft = 0;
-      chrome.storage.sync.remove("pausedTimeLeft");
-
-      // 킵얼라이브 다시 시작
-      startKeepAlive();
-    } else {
-      // 저장된 시간이 없으면 기본 간격으로 재설정
-      chrome.runtime.sendMessage({ action: "resetAlarm" });
-
-      // 킵얼라이브 다시 시작
-      startKeepAlive();
-    }
-  }
-
-  updatePauseButtonState();
-}
-
-// 알람을 리셋
-function resetAlarm() {
-  settings.isPaused = false;
-  chrome.storage.sync.set({ settings });
-  chrome.runtime.sendMessage({ action: "resetAlarm" });
-  updatePauseButtonState();
-
-  // 킵얼라이브 재시작
-  startKeepAlive();
 }
 
 // Quick Settings 타이머 간격을 변경
 function changeInterval() {
-  const newInterval = parseInt(intervalSelect.value);
+  // 이전 인터벌 값 저장
+  const oldInterval = settings.interval;
+  const newInterval = parseInt(DOM.intervalSelect.value);
+
+  // 설정 값만 업데이트하고 저장
   settings.interval = newInterval;
-
-  // 설정 탭의 커스텀 인터벌 값도 업데이트
-  customIntervalInput.value = newInterval;
-
-  // 활성 프리셋 업데이트
-  intervalPresets.forEach((preset) => {
-    const value = parseInt(preset.dataset.value);
-    if (value === newInterval) {
-      preset.classList.add("active");
-    } else {
-      preset.classList.remove("active");
-    }
-  });
-
+  DOM.customIntervalInput.value = newInterval; // 설정 탭 동기화
+  updateIntervalPresetsUI(newInterval); // 프리셋 UI 업데이트
   chrome.storage.sync.set({ settings });
 
-  if (!settings.isPaused) {
-    nextReminderElement.innerHTML = settings.timerStarted
-      ? `${padZero(settings.interval)}:00`
-      : `<span class="paused">${padZero(settings.interval)}:00</span>`;
-    resetAlarm();
+  console.log(`인터벌 변경: ${oldInterval}분 → ${newInterval}분`);
+
+  // 일시 정지 상태일 때는 UI 업데이트하지 않음 (다음 사이클부터 적용)
+  if (settings.isPaused) {
+    console.log("일시 정지 상태에서 인터벌 변경: 다음 사이클부터 적용됩니다.");
+    return;
+  }
+
+  // 타이머가 시작되지 않은 경우는 UI만 업데이트
+  if (!settings.timerStarted) {
+    updateTimerDisplay(settings.interval, 0, true);
+    return;
+  }
+
+  // 타이머가 실행 중이고 일시 정지 아닌 경우에만 즉시 재설정
+  resetAlarm();
+}
+
+// 설정을 저장
+function saveSettings() {
+  // 카테고리 설정을 수집
+  const categories = {};
+  DOM.categoryCheckboxes.forEach((checkbox) => {
+    const category = checkbox.dataset.category;
+    categories[category] = checkbox.checked;
+  });
+
+  // 커스텀 인터벌 값 유효성 검증
+  validateCustomInterval();
+
+  // 이전 인터벌 값 저장 (변경 여부 확인용)
+  const previousInterval = settings.interval;
+  const newInterval = parseInt(DOM.customIntervalInput.value);
+  const intervalChanged = previousInterval !== newInterval;
+
+  // 새 설정 객체를 생성 (timerStarted 상태 유지)
+  settings = {
+    interval: newInterval,
+    notifications: DOM.notificationsToggle.checked,
+    exercises: DOM.exercisesToggle.checked,
+    language: DOM.languageSelect.value,
+    categories: categories,
+    workStart: DOM.workStartInput.value,
+    workEnd: DOM.workEndInput.value,
+    workHoursOnly: DOM.workHoursOnlyToggle.checked,
+    isPaused: false, // 설정 변경 시 일시정지 상태 해제
+    timerStarted: settings.timerStarted, // 타이머 시작 상태 유지
+  };
+
+  // 설정을 저장
+  chrome.storage.sync.set({ settings, pausedTimeLeft: 0 }, function () {
+    // 메인 탭의 인터벌 선택도 업데이트
+    DOM.intervalSelect.value = settings.interval;
+
+    // 타이머가 시작된 상태라면 무조건 재시작
+    if (settings.timerStarted) {
+      console.log(`설정 저장: 인터벌 ${settings.interval}분으로 타이머 재시작`);
+
+      // 알람 재설정 및 타이머 재시작
+      preciseTimer.reset();
+      chrome.runtime.sendMessage({ action: "resetAlarm" }, (response) => {
+        if (response && response.success) {
+          preciseTimer.start(settings.interval, onTimerComplete);
+        }
+      });
+
+      // UI 상태 업데이트 (일시정지 버튼)
+      updatePauseButtonState();
+    } else {
+      // 타이머가 시작되지 않은 경우 값만 표시
+      updateTimerDisplay(settings.interval, 0, true);
+    }
+
+    // UI 업데이트
+    updateAllUIElements();
+
+    // 저장 피드백을 표시
+    showSavedFeedbackUI();
+  });
+}
+
+// 저장 피드백을 표시
+function showSavedFeedbackUI() {
+  DOM.saveButton.textContent = i18n.get("options", "saved");
+  DOM.saveButton.style.backgroundColor = "#28a745";
+
+  setTimeout(() => {
+    DOM.saveButton.textContent = i18n.get("options", "save");
+    DOM.saveButton.style.backgroundColor = "#175dce";
+  }, APP_CONSTANTS.FEEDBACK_DISPLAY_TIME);
+}
+
+// 설정을 초기화
+function resetSettings() {
+  if (confirm(i18n.get("options", "resetConfirm"))) {
+    // 타이머 인터벌 정리
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
+    // 정밀 타이머 리셋
+    preciseTimer.reset();
+
+    // 기본 설정으로 복원
+    settings = { ...DEFAULT_SETTINGS };
+    chrome.storage.sync.set({ settings }, function () {
+      // 저장된 일시정지 시간 제거
+      chrome.storage.sync.remove("pausedTimeLeft");
+      pausedTimeLeft = 0;
+
+      // 알람을 중지
+      chrome.alarms.clear("postureReminderAlarm");
+      chrome.alarms.clear("postureReminderPrepare");
+      chrome.runtime.sendMessage({ action: "stopTimer" });
+
+      // UI 업데이트
+      updateAllUIElements();
+
+      // 초기 시간 표시 (기본 인터벌로 표시)
+      updateTimerDisplay(settings.interval, 0, true);
+
+      // 시작 버튼 표시
+      showStartButton();
+
+      // 초기화 피드백을 표시
+      DOM.resetButtonOptions.textContent = "Reset!";
+      setTimeout(() => {
+        DOM.resetButtonOptions.textContent = i18n.get("options", "reset");
+      }, APP_CONSTANTS.FEEDBACK_DISPLAY_TIME);
+    });
   }
 }
 
 // 오늘의 스트레칭 팁을 로드
 function loadStretchingTip() {
-  // 파라미터로 전달된 language를 사용하거나, 없으면 현재 설정에서 가져옴
+  // 현재 설정에서 언어를 가져옴
   const language = settings.language || "en";
 
   const exercisesFile =
@@ -658,8 +850,8 @@ function loadStretchingTip() {
       if (exercises.length > 0) {
         const randomIndex = Math.floor(Math.random() * exercises.length);
         const tip = exercises[randomIndex];
-        tipTitle.textContent = tip.title;
-        tipDescription.textContent = tip.description;
+        DOM.tipTitle.textContent = tip.title;
+        DOM.tipDescription.textContent = tip.description;
       }
     })
     .catch((error) => console.error("Failed to load stretching tip:", error));
@@ -667,157 +859,93 @@ function loadStretchingTip() {
 
 // 커스텀 인터벌 유효성 검사
 function validateCustomInterval() {
-  let value = parseInt(customIntervalInput.value);
+  let value = parseInt(DOM.customIntervalInput.value);
 
-  if (isNaN(value) || value < 1) {
-    value = 1;
-  } else if (value > 180) {
-    value = 180;
+  if (isNaN(value) || value < APP_CONSTANTS.MIN_INTERVAL) {
+    value = APP_CONSTANTS.MIN_INTERVAL;
+  } else if (value > APP_CONSTANTS.MAX_INTERVAL) {
+    value = APP_CONSTANTS.MAX_INTERVAL;
   }
 
-  customIntervalInput.value = value;
+  DOM.customIntervalInput.value = value;
   updateIntervalPresetsUI(value); // 프리셋 UI 업데이트
 }
 
-// 설정을 저장
-function saveSettings() {
-  // 카테고리 설정을 수집
-  const categories = {};
-  categoryCheckboxes.forEach((checkbox) => {
-    const category = checkbox.dataset.category;
-    categories[category] = checkbox.checked;
-  });
+// ===============================
+// 앱 초기화 및 이벤트 리스너
+// ===============================
 
-  // 커스텀 인터벌 값 유효성 검증
-  validateCustomInterval();
+// 앱 초기화
+function initApp() {
+  // 시작 버튼 섹션 생성
+  createStartButtonSection();
 
-  // 새 설정 객체를 생성 (timerStarted 상태 유지)
-  settings = {
-    interval: parseInt(customIntervalInput.value),
-    notifications: notificationsToggle.checked,
-    exercises: exercisesToggle.checked,
-    language: languageSelect.value,
-    categories: categories,
-    workStart: workStartInput.value,
-    workEnd: workEndInput.value,
-    workHoursOnly: workHoursOnlyToggle.checked,
-    isPaused: settings.isPaused,
-    timerStarted: settings.timerStarted, // 타이머 시작 상태 유지
-  };
+  // 설정 로드 및 UI 초기화
+  loadSettings();
 
-  // 설정을 저장
-  chrome.storage.sync.set({ settings }, function () {
-    // 알람을 재설정 (만약 일시정지 상태가 아니고 타이머가 시작되었다면)
-    if (!settings.isPaused && settings.timerStarted) {
-      chrome.runtime.sendMessage({ action: "resetAlarm" });
-    }
+  // 스트레칭 팁 로드
+  loadStretchingTip();
 
-    // 메인 탭 UI도 업데이트
-    updateMainTabUI();
+  // 탭 시스템 초기화
+  initTabSystem();
 
-    // 인터벌 프리셋 업데이트
-    updateIntervalPresetsUI(settings.interval);
-
-    updateDynamicTexts(settings.language);
-
-    // 저장 피드백을 표시
-    showSavedFeedbackUI();
-  });
+  // 이벤트 리스너 등록
+  registerEventListeners();
 }
 
-// 저장 피드백을 표시
-function showSavedFeedbackUI() {
-  saveButton.textContent = i18n.get("options", "saved");
-  saveButton.style.backgroundColor = "#28a745";
+// 모든 이벤트 리스너 등록
+function registerEventListeners() {
+  // 메인 탭 이벤트 리스너
+  DOM.pauseButton.addEventListener("click", togglePause);
+  DOM.resetButton.addEventListener("click", resetAlarm);
+  DOM.intervalSelect.addEventListener("change", changeInterval);
 
-  setTimeout(() => {
-    saveButton.textContent = i18n.get("options", "save");
-    saveButton.style.backgroundColor = "#175dce";
-  }, 2000);
-}
+  // 설정 탭 이벤트 리스너
+  DOM.customIntervalInput.addEventListener("change", validateCustomInterval);
+  DOM.customIntervalInput.addEventListener("keyup", (e) => {
+    updateIntervalPresetsUI(parseInt(e.target.value));
+  });
+  DOM.saveButton.addEventListener("click", saveSettings);
+  DOM.resetButtonOptions.addEventListener("click", resetSettings);
 
-// 설정을 초기화
-function resetSettings() {
-  if (confirm(i18n.get("options", "resetConfirm"))) {
-    // 킵얼라이브 중지
-    if (keepAliveInterval) {
-      clearInterval(keepAliveInterval);
-      keepAliveInterval = null;
-    }
+  // 인터벌 프리셋 이벤트 리스너
+  DOM.intervalPresets.forEach((preset) => {
+    preset.addEventListener("click", function () {
+      const value = parseInt(this.dataset.value);
+      DOM.customIntervalInput.value = value;
 
-    chrome.storage.sync.set({ settings: DEFAULT_SETTINGS }, function () {
-      settings = { ...DEFAULT_SETTINGS };
+      // 활성 클래스를 업데이트
+      DOM.intervalPresets.forEach((p) => p.classList.remove("active"));
+      this.classList.add("active");
 
-      // 알람을 중지
-      chrome.alarms.clear("postureReminderAlarm");
-      chrome.alarms.clear("postureReminderPrepare");
-
-      updateAllUIElements();
-
-      // 시작 버튼 표시
-      showStartButton();
-
-      // 초기화 피드백을 표시
-      resetButtonOptions.textContent = "Reset!";
-      setTimeout(() => {
-        resetButtonOptions.textContent = i18n.get("options", "reset");
-      }, 2000);
+      // 설정 저장 시 적용될 수 있도록 저장하지 않음
+      // 저장은 saveSettings() 함수에서 수행
     });
-  }
+  });
+
+  // 언로드 이벤트 리스너
+  window.addEventListener("unload", () => {
+    // 타이머 인터벌 정리
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
+    // 정밀 타이머 정리
+    if (preciseTimer) {
+      preciseTimer.reset();
+    }
+  });
 }
 
-// 인터벌 프리셋 클릭 이벤트
-intervalPresets.forEach((preset) => {
-  preset.addEventListener("click", function () {
-    const value = parseInt(this.dataset.value);
-    customIntervalInput.value = value;
+// DOM 로드 완료 시 초기화
+document.addEventListener("DOMContentLoaded", async () => {
+  // 언어 유틸리티 초기화
+  await i18n.init("popup");
 
-    // 활성 클래스를 업데이트
-    intervalPresets.forEach((p) => p.classList.remove("active"));
-    this.classList.add("active");
-  });
-});
+  // options 섹션 번역 로드
+  i18n.loadSection("options");
 
-// 이벤트 리스너 등록 - 메인 탭
-pauseButton.addEventListener("click", togglePause);
-resetButton.addEventListener("click", resetAlarm);
-intervalSelect.addEventListener("change", changeInterval);
-
-// 이벤트 리스너 등록 - 설정 탭
-customIntervalInput.addEventListener("change", validateCustomInterval);
-customIntervalInput.addEventListener("keyup", (e) => {
-  updateIntervalPresetsUI(parseInt(e.target.value));
-});
-saveButton.addEventListener("click", saveSettings);
-resetButtonOptions.addEventListener("click", resetSettings);
-
-// 페이지가 닫힐 때 타이머 인터벌 정리
-window.addEventListener("unload", () => {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-  }
-
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-  }
-
-  if (checkInterval) {
-    clearInterval(checkInterval);
-  }
-
-  // 팝업이 닫히기 전에 마지막으로 서비스 워커 활성화 요청 보내기
-  if (settings.timerStarted && !settings.isPaused) {
-    // 비동기이지만 팝업이 닫히기 전에 메시지가 전달되도록 시도
-    try {
-      chrome.runtime.sendMessage({
-        action: "keepAlive",
-        isClosing: true, // 팝업이 닫히는 중임을 알림
-      });
-
-      // 알람 재설정 요청도 함께 보냄
-      chrome.runtime.sendMessage({ action: "resetAlarm" });
-    } catch (e) {
-      console.error("팝업 닫기 전 메시지 전송 실패:", e);
-    }
-  }
+  // 앱 초기화
+  initApp();
 });

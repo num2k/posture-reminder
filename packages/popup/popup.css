@@ -23,19 +23,19 @@ header {
 }
 
 header h1 {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   margin: 0 0 8px 0;
   color: #175dce;
 }
 
 h1 {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   margin: 0 0 8px 0;
   color: #175dce;
 }
 
 h2 {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   margin: 0 0 8px 0;
   color: #175dce;
 }
@@ -52,7 +52,7 @@ h3 {
 }
 
 .tab-button {
-  padding: 8px 16px;
+  padding: 5px 16px;
   background-color: #f1f1f1;
   border: none;
   color: #111;
@@ -78,7 +78,7 @@ h3 {
 .timer-section {
   background-color: #f0f6ff;
   border-radius: 8px;
-  padding: 16px 50px;
+  padding: 12px 50px;
   margin-bottom: 16px;
   text-align: center;
 }
@@ -213,8 +213,8 @@ input[type="time"] {
 }
 
 .settings-section {
-  margin-bottom: 20px;
-  padding-bottom: 15px;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
   border-bottom: 1px solid #eee;
 }
 

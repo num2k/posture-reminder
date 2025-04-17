@@ -17,7 +17,6 @@ const DEFAULT_SETTINGS = {
 
 // 알람 ID
 const ALARM_NAME = "postureReminderAlarm"; // 주요 알람
-const AUTO_CLOSE_PREFIX = "autoClose_"; // 자동 닫기 알람 접두사
 const WAKE_UP_ALARM = "wakeUpServiceWorker"; // 서비스 워커 활성화 알람
 
 // 다국어 메시지
@@ -44,9 +43,6 @@ let exercisesLoaded = false; // 운동 데이터 로딩 여부 표시
 
 // 사용자 설정 캐시
 let cachedSettings = null;
-
-// 알림 ID 관리를 위한 Map
-const activeNotifications = new Map();
 
 // 서비스 워커 활성 상태를 확인하는 마지막 타임스탬프
 let lastActiveTimestamp = Date.now();
@@ -116,9 +112,6 @@ async function getSettings() {
 async function initAlarm() {
   const settings = await getSettings();
 
-  // 알림 정보 복원 - 서비스 워커 재활성화 시 기존 알림 관리를 위함
-  await restoreActiveNotifications();
-
   // 운동 데이터 미리 로딩
   await loadExercisesData(settings.language);
   exercisesLoaded = true;
@@ -136,7 +129,7 @@ async function initAlarm() {
   // 서비스 워커 상태 업데이트
   updateServiceWorkerStatus();
 
-  // 주기적으로 알림을 정리하는 인터벌 설정
+  // 주기적으로 서비스워커 상태를 확인하는 인터벌 설정
   setupStatusCheckInterval();
 }
 
@@ -147,9 +140,8 @@ function setupStatusCheckInterval() {
     clearInterval(statusCheckIntervalId);
   }
 
-  // 30초마다 알림 정리 및 서비스 워커 상태 확인
+  // 30초마다 서비스 워커 상태 확인
   statusCheckIntervalId = setInterval(() => {
-    checkAndCleanupNotifications();
     updateServiceWorkerStatus();
   }, 30000);
 }
@@ -158,13 +150,54 @@ function setupStatusCheckInterval() {
 function setupWakeUpAlarm() {
   // 기존 웨이크업 알람 제거
   chrome.alarms.clear(WAKE_UP_ALARM, () => {
-    // 30초마다 서비스 워커를 깨우는 알람 설정
+    // 서비스 워커를 더 자주 깨우는 알람 설정 (5초마다)
     chrome.alarms.create(WAKE_UP_ALARM, {
-      delayInMinutes: 0.5, // 30초
-      periodInMinutes: 0.5, // 30초마다 반복
+      delayInMinutes: 0.08, // 5초
+      periodInMinutes: 0.08, // 5초마다 반복
     });
 
-    console.log("서비스 워커 활성화 알람이 30초 간격으로 설정됨");
+    console.log("서비스 워커 활성화 알람이 5초 간격으로 설정됨");
+
+    // 메인 알람이 제대로 설정되어 있는지 확인
+    checkAndResetMainAlarm();
+  });
+}
+
+// 메인 알람이 제대로 설정되어 있는지 확인하고 필요하면 재설정하는 함수
+function checkAndResetMainAlarm() {
+  chrome.storage.sync.get(["settings"], function (result) {
+    const settings = result.settings || DEFAULT_SETTINGS;
+
+    // 타이머가 활성화된 상태인 경우만 알람 확인
+    if (settings.timerStarted && !settings.isPaused) {
+      chrome.alarms.get(ALARM_NAME, (alarm) => {
+        const now = Date.now();
+        // 알람이 없거나 스케줄된 시간이 2분 이상 과거인 경우에만 재설정
+        // 2분보다 짧은 시간이 지났다면 알람이 정상적으로 처리 중일 수 있으므로 재설정하지 않음
+        if (!alarm) {
+          console.log("메인 알람이 누락됨, 재설정 중...");
+          scheduleAlarm(settings.interval);
+        } else if (alarm.scheduledTime < now - 120000) {
+          // 2분(120초) 전 시간과 비교
+          console.log("메인 알람이 2분 이상 과거로 설정됨, 재설정 중...");
+          scheduleAlarm(settings.interval);
+        } else if (alarm.scheduledTime < now) {
+          console.log(
+            `메인 알람이 과거 시간(${Math.round(
+              (now - alarm.scheduledTime) / 1000
+            )}초 전)으로 설정되어 있지만, 아직 처리 중일 수 있으므로 재설정하지 않음`
+          );
+        } else {
+          console.log(
+            `메인 알람 확인 완료, 예정 시간: ${new Date(
+              alarm.scheduledTime
+            ).toLocaleTimeString()}, ${Math.round(
+              (alarm.scheduledTime - now) / 1000
+            )}초 후`
+          );
+        }
+      });
+    }
   });
 }
 
@@ -182,22 +215,55 @@ function updateServiceWorkerStatus() {
   });
 }
 
-// 알람을 설정합니다 (단순화된 버전)
+// 알람을 설정합니다 (안정화된 버전)
 function scheduleAlarm(intervalMinutes) {
-  // 기존 알람 제거
+  // 기존 알람을 항상 제거하고 새로 생성하는 방식으로 변경
   chrome.alarms.clear(ALARM_NAME, () => {
-    // 알람 설정
+    // 새 알람 설정
     chrome.alarms.create(ALARM_NAME, {
       delayInMinutes: intervalMinutes,
       periodInMinutes: intervalMinutes,
     });
 
-    console.log(`알람이 ${intervalMinutes}분 간격으로 설정됨`);
+    console.log(`알람이 새로 설정됨: ${intervalMinutes}분 간격`);
     console.log(
       `다음 알람 예정 시간: ${new Date(
         Date.now() + intervalMinutes * 60 * 1000
       ).toLocaleTimeString()}`
     );
+
+    // 서비스 워커 상태 업데이트
+    updateServiceWorkerStatus();
+  });
+}
+
+// 정확한 타이밍으로 알람을 설정하는 함수
+function scheduleExactAlarm(intervalMinutes) {
+  // 기존 알람 제거
+  chrome.alarms.clear(ALARM_NAME, () => {
+    // 정확한 시간 계산을 위해 미리초 단위의 계산 사용
+    const exactMilliseconds = intervalMinutes * 60 * 1000;
+    const exactDelayInMinutes = intervalMinutes;
+
+    // 새 알람 설정 - 정확한 시간에 맞추어 설정
+    chrome.alarms.create(ALARM_NAME, {
+      delayInMinutes: exactDelayInMinutes,
+      periodInMinutes: intervalMinutes, // 이후에는 기본 간격으로 반복
+    });
+
+    // 알람 생성 시간과 예정 시간을 모두 기록
+    const now = Date.now();
+    const scheduledTime = now + exactMilliseconds;
+    console.log(`정확한 알람이 설정됨: ${exactDelayInMinutes.toFixed(4)}분 후`);
+    console.log(`알람 생성 시간: ${new Date(now).toLocaleTimeString()}`);
+    console.log(
+      `다음 정확한 알람 예정 시간: ${new Date(
+        scheduledTime
+      ).toLocaleTimeString()}, 간격: ${intervalMinutes}분`
+    );
+
+    // 서비스 워커 상태 업데이트
+    updateServiceWorkerStatus();
   });
 }
 
@@ -231,46 +297,58 @@ function scheduleOneTimeAlarm(delayInMinutes) {
 
 // 알람 이벤트 리스너
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  console.log(`알람 발생: ${alarm.name}`);
+  console.log(`알람 발생: ${alarm.name} - ${new Date().toLocaleTimeString()}`);
 
   // 서비스 워커 웨이크업 알람인 경우
   if (alarm.name === WAKE_UP_ALARM) {
     updateServiceWorkerStatus();
 
-    // 활성 알림 상태 확인 및 복원 (웨이크업 시마다)
+    // 웨이크업 알람 처리 로직은 그대로 유지
     const settings = await getSettings();
     if (settings.timerStarted && !settings.isPaused) {
-      checkAndCleanupNotifications();
-
       // 알림을 표시해야 할 시간이 다가오면 미리 준비
       const nextAlarmTime = await getNextAlarmTime();
       if (nextAlarmTime && nextAlarmTime - Date.now() < 60000) {
         // 1분 이내
-        console.log("알림 표시 준비 중...");
+        console.log("알림 표시 준비 중... (1분 이내 알림 예정)");
         // 운동 데이터 미리 로드
         if (!exercisesLoaded) {
           await loadExercisesData(settings.language);
           exercisesLoaded = true;
         }
       }
+
+      // 알람 상태 확인
+      chrome.alarms.get(ALARM_NAME, (alarm) => {
+        const now = Date.now();
+        if (!alarm) {
+          console.log("웨이크업 체크: 메인 알람이 없음, 재설정 중...");
+          scheduleExactAlarm(settings.interval);
+        } else if (alarm.scheduledTime < now - 5000) {
+          // 5초 이상 지난 알람은 재설정
+          console.log(
+            `웨이크업 체크: 메인 알람이 과거 시간으로 설정됨 (${Math.round(
+              (now - alarm.scheduledTime) / 1000
+            )}초 전), 재설정 중...`
+          );
+          scheduleExactAlarm(settings.interval);
+        }
+      });
     }
     return;
   }
 
-  // 자동 닫기 알람인 경우
-  if (alarm.name.startsWith(AUTO_CLOSE_PREFIX)) {
-    const notificationId = alarm.name.replace(AUTO_CLOSE_PREFIX, "");
-    console.log(`알림 자동 닫기 실행: ${notificationId}`);
-    await clearNotification(notificationId);
-
-    // 활성 알림 목록에서 제거하고 저장된 정보도 업데이트
-    activeNotifications.delete(notificationId);
-    saveActiveNotifications();
-    return;
-  }
-
+  // 메인 알람이 발생한 경우
   if (alarm.name === ALARM_NAME) {
     try {
+      // 알람 발생 시각 정확하게 기록
+      const alarmTriggerTime = Date.now();
+      console.log(
+        `메인 알람 발생 시각: ${new Date(
+          alarmTriggerTime
+        ).toLocaleTimeString()}`
+      );
+
       const settings = await getSettings();
 
       // 서비스 워커 상태 업데이트
@@ -282,13 +360,24 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         return;
       }
 
-      // 알림이 비활성화되어 있으면 실행 중단
+      // 타이머가 중지된 상태이면 알림을 표시하지 않음
+      if (!settings.timerStarted) {
+        console.log("타이머가 중지된 상태이므로 알림을 표시하지 않음");
+        return;
+      }
+
+      // 중요: 먼저 다음 알람을 설정하여 타이밍 문제 해결
+      // 다음 알람을 강화된 방식으로 설정 - 빠르게 먼저 설정
+      scheduleExactAlarm(settings.interval);
+      console.log(`다음 알람 설정 완료: ${settings.interval}분 후`);
+
+      // 알림이 비활성화되어 있으면 알림 표시 생략
       if (!settings.notifications) {
         console.log("알림이 비활성화 되어있음");
         return;
       }
 
-      // 근무 시간 중에만 알림 표시 설정이 켜져 있고, 현재 근무 시간이 아니면 실행 중단
+      // 근무 시간 설정에 따라 표시 여부 결정
       if (
         settings.workHoursOnly &&
         !isWithinWorkHours(settings.workStart, settings.workEnd)
@@ -307,9 +396,44 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       selectedExercise = await selectExercise(settings);
 
       // 알림 표시
-      await showNotification(settings);
+      console.log("알림 표시 시작...");
+      try {
+        await showNotification(settings);
+        console.log("알림 표시 완료");
+      } catch (error) {
+        console.error("알림 표시 중 오류 발생:", error);
+      }
+
+      // 알람 처리에 소요된 시간 기록
+      const processingTime = Date.now() - alarmTriggerTime;
+      console.log(`알람 처리 소요 시간: ${processingTime}ms`);
+
+      // 알람 설정 확인
+      setTimeout(() => {
+        chrome.alarms.get(ALARM_NAME, (alarm) => {
+          if (alarm) {
+            console.log(
+              `알람 설정 확인: ${new Date(
+                alarm.scheduledTime
+              ).toLocaleTimeString()}에 예정됨`
+            );
+          } else {
+            console.error("알람이 설정되지 않았음! 긴급 재설정 시도");
+            scheduleExactAlarm(settings.interval);
+          }
+        });
+      }, 2000);
     } catch (error) {
       console.error("알람 처리 중 오류 발생:", error);
+
+      // 오류 발생 시에도 다음 알람 설정 시도
+      try {
+        const settings = await getSettings();
+        scheduleExactAlarm(settings.interval);
+        console.log("오류 발생 후 알람 재설정 시도 완료");
+      } catch (e) {
+        console.error("오류 복구 실패:", e);
+      }
     }
   }
 });
@@ -434,8 +558,7 @@ async function showNotification(settings) {
             { title: getMessage("remindLater", language) },
             { title: getMessage("stretchNow", language) },
           ],
-          requireInteraction: true, // 사용자 상호작용 없이도 알람 종료 시간에 자동 닫힘
-          silent: false, // 소리 없음 설정 해제
+          requireInteraction: false, // 자동 닫힘 허용
         },
         (notificationId) => {
           if (chrome.runtime.lastError) {
@@ -447,114 +570,15 @@ async function showNotification(settings) {
       );
     });
 
-    // 자동 닫기 시간 설정 (알람 간격의 5초 후)
-    const autoCloseSeconds = settings.interval * 60 + 5; // ex: interval이 1 = 65
-    const autoCloseTimeMs = Date.now() + autoCloseSeconds * 1000;
-
-    // 알림 자동 닫기 알람 설정
-    chrome.alarms.create(AUTO_CLOSE_PREFIX + notificationId, {
-      delayInMinutes: autoCloseSeconds / 60, // 분 단위로 변환
-    });
-
-    // 활성 알림 맵에 저장
-    activeNotifications.set(notificationId, autoCloseTimeMs);
-
-    // 활성 알림 정보를 storage에 저장
-    saveActiveNotifications();
-
-    console.log(
-      `알림 표시됨: ${notificationId}, 자동 닫기 예정: ${autoCloseSeconds}초 후`
-    );
+    console.log(`알림 표시됨: ${notificationId}, 자동으로 닫힘이 허용됨`);
   } catch (error) {
     console.error("알림 생성 중 오류 발생:", error);
   }
 }
 
-// 활성 알림 정보를 storage에 저장하는 함수
-function saveActiveNotifications() {
-  // Map을 Object로 변환하여 저장
-  const notificationData = {};
-  for (const [id, closeTime] of activeNotifications.entries()) {
-    notificationData[id] = closeTime;
-  }
-
-  chrome.storage.local.set({ activeNotifications: notificationData }, () => {
-    console.log(
-      "활성 알림 정보가 저장됨:",
-      Object.keys(notificationData).length + "개"
-    );
-  });
-}
-
-// Storage에서 활성 알림 정보를 복원하는 함수
-async function restoreActiveNotifications() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(["activeNotifications"], async (result) => {
-      const notificationData = result.activeNotifications || {};
-
-      // 기존 알림 맵 초기화
-      activeNotifications.clear();
-
-      // 저장된 알림 정보 복원
-      const now = Date.now();
-      let restoredCount = 0;
-
-      for (const [id, closeTime] of Object.entries(notificationData)) {
-        // 아직 닫히지 않은 알림만 복원 (만료 시간이 현재보다 나중인 경우)
-        if (closeTime > now) {
-          activeNotifications.set(id, closeTime);
-
-          // 자동 닫기 알람 재설정
-          const remainingSeconds = Math.max(0, (closeTime - now) / 1000);
-          if (remainingSeconds > 0) {
-            chrome.alarms.create(AUTO_CLOSE_PREFIX + id, {
-              delayInMinutes: remainingSeconds / 60, // 분 단위로 변환
-            });
-            restoredCount++;
-          }
-        } else {
-          // 이미 만료된 알림은 정리
-          await clearNotification(id);
-        }
-      }
-
-      console.log(`활성 알림 정보가 복원됨: ${restoredCount}개`);
-      resolve();
-    });
-  });
-}
-
-// 모든 활성 알림을 정리하는 함수
-async function clearAllNotifications() {
-  // 현재 활성화된 모든 자동 닫기 알람을 취소
-  for (const notificationId of activeNotifications.keys()) {
-    chrome.alarms.clear(AUTO_CLOSE_PREFIX + notificationId);
-    await clearNotification(notificationId);
-  }
-
-  activeNotifications.clear();
-  saveActiveNotifications();
-}
-
-// 특정 알림 ID를 정리하는 함수
-function clearNotification(notificationId) {
-  return new Promise((resolve) => {
-    chrome.notifications.clear(notificationId, (wasCleared) => {
-      resolve(wasCleared);
-    });
-  });
-}
-
 // 알림 버튼 클릭 리스너
 chrome.notifications.onButtonClicked.addListener(
   async (notificationId, buttonIndex) => {
-    // 해당 알림의 자동 닫기 알람 취소
-    chrome.alarms.clear(AUTO_CLOSE_PREFIX + notificationId);
-
-    // 활성 알림 목록에서 제거
-    activeNotifications.delete(notificationId);
-    saveActiveNotifications();
-
     if (buttonIndex === 0) {
       // 5분 후에 알림
       scheduleOneTimeAlarm(5);
@@ -563,21 +587,10 @@ chrome.notifications.onButtonClicked.addListener(
       chrome.tabs.create({ url: "popup/stretching_guide.html" });
     }
 
-    await clearNotification(notificationId);
+    // 알림 닫기
+    chrome.notifications.clear(notificationId);
   }
 );
-
-// 알림이 닫힐 때 정리하는 리스너
-chrome.notifications.onClosed.addListener((notificationId) => {
-  // 해당 알림의 자동 닫기 알람 취소
-  chrome.alarms.clear(AUTO_CLOSE_PREFIX + notificationId);
-
-  // 활성 알림 목록에서 제거
-  activeNotifications.delete(notificationId);
-  saveActiveNotifications();
-
-  console.log(`알림 닫힘: ${notificationId}`);
-});
 
 // 설정 변경 리스너
 chrome.storage.onChanged.addListener(async (changes, area) => {
@@ -622,12 +635,68 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // 타이머가 시작된 경우에만 알람을 설정
       if (settings.timerStarted) {
-        scheduleAlarm(settings.interval);
-        console.log("타이머가 시작됨: 알람 설정됨");
+        // immediate 파라미터가 있으면 즉시 다음 알람을 설정 (0초 지연 없이)
+        if (message.immediate) {
+          console.log("즉시 알람 재설정 요청 처리 중...");
+          chrome.alarms.clear(ALARM_NAME, () => {
+            // 새 알람을 즉시 설정 (일반 스케줄링보다 우선 처리)
+            const nextAlarmTime = Date.now() + settings.interval * 60 * 1000;
+            chrome.alarms.create(ALARM_NAME, {
+              when: nextAlarmTime, // 정확한 시간 지정
+              periodInMinutes: settings.interval, // 이후 반복 간격
+            });
+            console.log(
+              `즉시 알람 재설정 완료: 다음 알람 ${
+                settings.interval
+              }분 후 (${new Date(nextAlarmTime).toLocaleTimeString()})`
+            );
 
-        // 응답이 필요한 경우 sendResponse 호출
-        if (sendResponse) {
-          sendResponse({ success: true, message: "알람 설정됨" });
+            // 응답 전송 - 다음 알람 시간도 함께 전달
+            if (sendResponse) {
+              sendResponse({
+                success: true,
+                message: "알람 즉시 재설정 완료",
+                nextAlarmAt: nextAlarmTime,
+              });
+            }
+
+            // 알람이 제대로 설정되었는지 확인
+            setTimeout(() => {
+              chrome.alarms.get(ALARM_NAME, (alarm) => {
+                if (alarm) {
+                  console.log(
+                    `알람 확인: ${new Date(
+                      alarm.scheduledTime
+                    ).toLocaleTimeString()}`
+                  );
+                } else {
+                  console.error("알람 설정 실패! 재시도합니다.");
+                  chrome.alarms.create(ALARM_NAME, {
+                    when: nextAlarmTime,
+                    periodInMinutes: settings.interval,
+                  });
+                }
+              });
+            }, 500);
+          });
+        } else {
+          // 일반 알람 재설정
+          scheduleAlarm(settings.interval);
+          console.log("타이머가 시작됨: 알람 설정됨");
+
+          // 다음 알람 시간 가져오기
+          chrome.alarms.get(ALARM_NAME, (alarm) => {
+            // 응답이 필요한 경우 sendResponse 호출
+            if (sendResponse) {
+              sendResponse({
+                success: true,
+                message: "알람 설정됨",
+                nextAlarmAt: alarm
+                  ? alarm.scheduledTime
+                  : Date.now() + settings.interval * 60 * 1000,
+              });
+            }
+          });
         }
       } else {
         console.log("타이머가 시작되지 않았음: 알람을 설정하지 않음");
@@ -724,17 +793,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true, timestamp: lastActiveTimestamp });
     }
     return true;
-  } else if (message.action === "checkNotifications") {
-    checkAndCleanupNotifications();
-
-    if (sendResponse) {
-      sendResponse({
-        success: true,
-        activeCount: activeNotifications.size,
-        lastActive: lastActiveTimestamp,
-      });
-    }
-    return true;
   } else if (message.action === "wakeUpServiceWorker") {
     // 서비스 워커 웨이크업 요청 처리
     console.log("서비스 워커 웨이크업 요청 받음");
@@ -760,29 +818,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
-
-// 알림 상태를 확인하고 필요한 경우 정리하는 함수
-async function checkAndCleanupNotifications() {
-  console.log("알림 상태 확인 및 정리 중...");
-
-  const now = Date.now();
-  let cleanedCount = 0;
-
-  // 이미 만료된 알림 정리
-  for (const [id, closeTime] of activeNotifications.entries()) {
-    if (closeTime <= now) {
-      await clearNotification(id);
-      chrome.alarms.clear(AUTO_CLOSE_PREFIX + id);
-      activeNotifications.delete(id);
-      cleanedCount++;
-    }
-  }
-
-  if (cleanedCount > 0) {
-    console.log(`${cleanedCount}개의 만료된 알림을 정리`);
-    saveActiveNotifications();
-  }
-}
 
 // 서비스 워커 시작 시 초기화
 initAlarm();
