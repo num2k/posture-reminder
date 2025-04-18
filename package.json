@@ -9,7 +9,7 @@
     "copy:html": "copyfiles -u 1 packages/popup/*.html dist",
     "copy:data": "copyfiles -u 1 packages/data/*.json dist",
     "copy:manifest": "copyfiles -u 1 packages/manifest.json dist",
-    "minify:js": "esbuild packages/background.js packages/popup/popup.js packages/popup/stretching_guide.js packages/data/locale-utils.js --bundle --minify --outdir=dist --format=iife --target=es2015",
+    "minify:js": "esbuild packages/background.js packages/popup/popup.js packages/popup/stretching_guide.js packages/data/locale-utils.js packages/offscreen.js --bundle --minify --outdir=dist --format=iife --target=es2015",
     "minify:css": "esbuild packages/popup/popup.css packages/popup/stretching_guide.css --minify --outdir=dist/popup",
     "minify:html": "node minify-html.js",
     "build": "npm run clean && npm run copy:manifest && npm run copy:assets && npm run copy:data && npm run minify:js && npm run minify:css && npm run minify:html",

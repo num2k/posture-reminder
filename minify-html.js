@@ -19,7 +19,11 @@ const minifyOptions = {
 };
 
 // HTML 파일 목록
-const htmlFiles = ["popup/popup.html", "popup/stretching_guide.html"];
+const htmlFiles = [
+  "popup/popup.html",
+  "popup/stretching_guide.html",
+  "offscreen.html",
+];
 
 async function minifyHtmlFiles() {
   try {

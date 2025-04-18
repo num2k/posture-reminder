@@ -170,6 +170,43 @@
                 >
               </label>
             </div>
+            <div class="setting-item checkbox">
+              <label>
+                <input type="checkbox" id="sound-toggle" />
+                <span
+                  data-i18n="useSoundNotification"
+                  data-i18n-section="options"
+                  >Use sound notification</span
+                >
+              </label>
+            </div>
+            <div class="setting-item" id="sound-volume-row">
+              <label for="sound-volume-slider">
+                <span data-i18n="soundVolume" data-i18n-section="options"
+                  >Sound volume</span
+                >
+                <span id="sound-volume-value">100</span>%
+              </label>
+              <div class="slider-container">
+                <input
+                  type="range"
+                  id="sound-volume-slider"
+                  min="0"
+                  max="100"
+                  value="100"
+                  style="width: 80%; vertical-align: middle; margin-right: 8px"
+                />
+                <button
+                  id="sound-preview-btn"
+                  type="button"
+                  style="margin-left: 8px; min-width: 80px; padding: 4px 8px"
+                >
+                  <span data-i18n="soundPreview" data-i18n-section="options"
+                    >preview</span
+                  >
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 

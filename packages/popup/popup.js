@@ -13,6 +13,8 @@ const APP_CONSTANTS = {
 const DEFAULT_SETTINGS = {
   interval: APP_CONSTANTS.DEFAULT_INTERVAL, // 기본 5분 간격
   notifications: true,
+  sound: true, // 알림 소리 사용 여부(기본값: 사용)
+  soundVolume: 100, // 알림 소리 볼륨(0~100, 기본값 100)
   exercises: true,
   language: "en",
   categories: {
@@ -54,6 +56,10 @@ const DOM = {
   customIntervalInput: document.getElementById("custom-interval"),
   intervalPresets: document.querySelectorAll(".interval-preset"),
   notificationsToggle: document.getElementById("notifications-toggle"),
+  soundToggle: document.getElementById("sound-toggle"),
+  soundVolumeSlider: document.getElementById("sound-volume-slider"),
+  soundVolumeValue: document.getElementById("sound-volume-value"),
+  soundPreviewBtn: document.getElementById("sound-preview-btn"),
   exercisesToggle: document.getElementById("exercises-toggle"),
   categoryCheckboxes: document.querySelectorAll(".category-item input"),
   workStartInput: document.getElementById("work-start"),
@@ -618,6 +624,9 @@ function updateIntervalPresetsUI(number) {
 function updateSettingsTabUI() {
   DOM.customIntervalInput.value = settings.interval;
   DOM.notificationsToggle.checked = settings.notifications;
+  DOM.soundToggle.checked = settings.sound;
+  DOM.soundVolumeSlider.value = settings.soundVolume ?? 100;
+  DOM.soundVolumeValue.textContent = settings.soundVolume ?? 100;
   DOM.exercisesToggle.checked = settings.exercises;
 
   // 언어 선택 UI 업데이트
@@ -741,6 +750,8 @@ function saveSettings() {
   settings = {
     interval: newInterval,
     notifications: DOM.notificationsToggle.checked,
+    sound: DOM.soundToggle.checked, // 알림 소리 설정 저장
+    soundVolume: parseInt(DOM.soundVolumeSlider.value), // 볼륨 저장
     exercises: DOM.exercisesToggle.checked,
     language: DOM.languageSelect.value,
     categories: categories,
@@ -871,6 +882,26 @@ function validateCustomInterval() {
   updateIntervalPresetsUI(value); // 프리셋 UI 업데이트
 }
 
+// 볼륨 슬라이더 UI 및 미리듣기 이벤트
+function registerSoundVolumeEvents() {
+  if (!DOM.soundVolumeSlider || !DOM.soundVolumeValue || !DOM.soundPreviewBtn)
+    return;
+  DOM.soundVolumeSlider.addEventListener("input", (e) => {
+    DOM.soundVolumeValue.textContent = e.target.value;
+  });
+  DOM.soundPreviewBtn.addEventListener("click", () => {
+    // 저장 전 미리듣기: 현재 슬라이더 값으로만 재생
+    chrome.runtime.sendMessage({
+      type: "play-audio",
+      play: {
+        source: "assets/sounds/alarm.wav",
+        volume: parseInt(DOM.soundVolumeSlider.value) / 100,
+      },
+      preview: true,
+    });
+  });
+}
+
 // ===============================
 // 앱 초기화 및 이벤트 리스너
 // ===============================
@@ -891,6 +922,9 @@ function initApp() {
 
   // 이벤트 리스너 등록
   registerEventListeners();
+
+  // 볼륨 슬라이더 및 미리듣기 이벤트 등록
+  registerSoundVolumeEvents();
 }
 
 // 모든 이벤트 리스너 등록

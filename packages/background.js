@@ -3,6 +3,8 @@ const DEFAULT_SETTINGS = {
   interval: 5, // 기본 5분 간격
   notifications: true,
   exercises: true,
+  sound: true, // 알림 소리 사용 여부(기본값: 사용)
+  soundVolume: 100, // 알림 소리 볼륨(0~100, 기본값 100)
   language: "en", // 기본 언어 영어
   categories: {
     neck: true,
@@ -295,6 +297,79 @@ function scheduleOneTimeAlarm(delayInMinutes) {
   });
 }
 
+// 오프스크린 문서 생성 함수
+async function createOffscreenIfNeeded() {
+  if (chrome.offscreen && !(await chrome.offscreen.hasDocument?.())) {
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+      justification: "Play a notification sound",
+    });
+  }
+}
+
+// 알림 소리 재생 함수
+async function playNotificationSound(settingsOrVolume) {
+  let volume = 1;
+  if (typeof settingsOrVolume === "object") {
+    if (settingsOrVolume && settingsOrVolume.sound === false) return;
+    volume = (settingsOrVolume.soundVolume ?? 100) / 100;
+  } else if (typeof settingsOrVolume === "number") {
+    volume = settingsOrVolume;
+  }
+  await createOffscreenIfNeeded();
+  chrome.runtime.sendMessage({
+    type: "play-audio",
+    play: {
+      source: "assets/sounds/alarm.wav",
+      volume: volume,
+    },
+  });
+}
+
+// 알림을 표시합니다
+async function showNotification(settings) {
+  console.log("알림 표시 중...");
+
+  const language = settings.language || "en";
+  const exercise = selectedExercise || (await selectExercise(settings));
+
+  // 알림 ID 생성
+  const notificationId = "posture-reminder-" + Date.now();
+
+  try {
+    await new Promise((resolve, reject) => {
+      chrome.notifications.create(
+        notificationId,
+        {
+          type: "basic",
+          iconUrl: "assets/images/icon128.png",
+          title: getMessage("title", language),
+          message: `${exercise.title}: ${exercise.description}`,
+          priority: 2,
+          buttons: [
+            { title: getMessage("remindLater", language) },
+            { title: getMessage("stretchNow", language) },
+          ],
+          requireInteraction: false, // 자동 닫힘 허용
+        },
+        (notificationId) => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve(notificationId);
+          }
+        }
+      );
+    });
+    // 알림 소리 재생
+    await playNotificationSound(settings);
+    console.log(`알림 표시됨: ${notificationId}, 자동으로 닫힘이 허용됨`);
+  } catch (error) {
+    console.error("알림 생성 중 오류 발생:", error);
+  }
+}
+
 // 알람 이벤트 리스너
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   console.log(`알람 발생: ${alarm.name} - ${new Date().toLocaleTimeString()}`);
@@ -531,48 +606,6 @@ function isWithinWorkHours(startTime, endTime) {
       currentTotalMinutes >= startTotalMinutes &&
       currentTotalMinutes <= endTotalMinutes
     );
-  }
-}
-
-// 알림을 표시합니다
-async function showNotification(settings) {
-  console.log("알림 표시 중...");
-
-  const language = settings.language || "en";
-  const exercise = selectedExercise || (await selectExercise(settings));
-
-  // 알림 ID 생성
-  const notificationId = "posture-reminder-" + Date.now();
-
-  try {
-    await new Promise((resolve, reject) => {
-      chrome.notifications.create(
-        notificationId,
-        {
-          type: "basic",
-          iconUrl: "assets/images/icon128.png",
-          title: getMessage("title", language),
-          message: `${exercise.title}: ${exercise.description}`,
-          priority: 2,
-          buttons: [
-            { title: getMessage("remindLater", language) },
-            { title: getMessage("stretchNow", language) },
-          ],
-          requireInteraction: false, // 자동 닫힘 허용
-        },
-        (notificationId) => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else {
-            resolve(notificationId);
-          }
-        }
-      );
-    });
-
-    console.log(`알림 표시됨: ${notificationId}, 자동으로 닫힘이 허용됨`);
-  } catch (error) {
-    console.error("알림 생성 중 오류 발생:", error);
   }
 }
 
@@ -815,6 +848,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     });
 
+    return true;
+  } else if (message.type === "play-audio" && message.play) {
+    // 미리듣기(프리뷰) 요청도 지원
+    const volume =
+      typeof message.play.volume === "number" ? message.play.volume : 1;
+    playNotificationSound(volume);
+    if (sendResponse) sendResponse({ success: true });
     return true;
   }
 });
